@@ -26,13 +26,11 @@
       background: #333;
       color: #fff;
     }
-    h1, h2 {
-      color: #ffffff;
-    }
-    h2 {
-      margin-top: 2rem;
-      border-bottom: 1px solid #444;
-      padding-bottom: 0.3rem;
+    .category {
+      background: #222;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #00ffd0;
     }
   </style>
 </head>
@@ -81,30 +79,30 @@
         const priceData = {};
         for (const coin of data) {
           const price24hPast = coin.current_price / (1 + (coin.price_change_percentage_24h / 100));
-          const qtyCurrent = coin.circulating_supply || 0;
-          const qtyMax = coin.max_supply || 0;
+          const qtyCurrent = Math.round(coin.circulating_supply || 0);
+          const qtyMax = coin.max_supply === null || coin.max_supply === 0 ? 'Unlimited' : Math.round(coin.max_supply);
 
           priceData[coin.id] = {
             currentPrice: coin.current_price,
             pastPrice: price24hPast,
             priceChange24h: coin.price_change_percentage_24h,
             priceChange1h: coin.price_change_percentage_1h_in_currency,
-            qty: `${Math.round(qtyCurrent)} / ${Math.round(qtyMax)}`
+            qty: `${qtyCurrent} / ${qtyMax}`
           };
         }
 
-        let html = '';
+        let html = `<table>
+          <tr>
+            <th>Coin</th>
+            <th>Price Current (USD)</th>
+            <th>Price 24h Past (USD)</th>
+            <th>24h Change %</th>
+            <th>1h Change %</th>
+            <th>Qty Current / Max</th>
+          </tr>`;
+
         for (const [category, ids] of Object.entries(categories)) {
-          html += `<h2>${category}</h2>`;
-          html += `<table>
-            <tr>
-              <th>Coin</th>
-              <th>Price Current (USD)</th>
-              <th>Price 24h Past (USD)</th>
-              <th>24h Change %</th>
-              <th>1h Change %</th>
-              <th>Qty Current / Max</th>
-            </tr>`;
+          html += `<tr class="category"><td colspan="6">${category}</td></tr>`;
 
           for (const id of ids) {
             const coin = priceData[id];
@@ -122,10 +120,9 @@
               <td>${coin.qty}</td>
             </tr>`;
           }
-
-          html += '</table>';
         }
 
+        html += '</table>';
         document.getElementById('prices').innerHTML = html;
       } catch (e) {
         document.getElementById('prices').textContent = 'Error loading data';
