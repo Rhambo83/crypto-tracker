@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binance Crypto Tracker</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #121212; color: #eee; }
+    h1 { color: #00e676; }
+    h2 { color: #00e676; margin-top: 2rem; }
+    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+    th, td { border: 1px solid #444; padding: 0.5rem; text-align: left; }
+    th { background: #222; color: #eee; }
+    td { background: #1e1e1e; }
+  </style>
+</head>
+<body>
+  <h1>Binance Crypto Tracker</h1>
+  <p>Live prices for your priority tokens:</p>
+  <div id="prices">Loading…</div>
+
+  <script>
+    const coinGroups = {
+      "Mainstream Coins": ["BTC", "ETH", "LTC"],
+      "Altcoins": ["ADA", "SOL", "DOT", "LINK", "XLM", "TRX"],
+      "Exchange & Meme Coins": ["BNB", "DOGE"],
+      "Ecosystem Coins": ["ATOM", "AVAX", "THETA"]
+    };
+
+    async function fetchMarketData() {
+      const symbols = Object.values(coinGroups).flat();
+      const marketData = {};
+      const promises = symbols.map(sym => 
+        fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`)
+          .then(res => res.ok ? res.json() : null)
+          .then(data => { if (data) marketData[sym] = data; })
+      );
+      await Promise.all(promises);
+      return marketData;
+    }
+
+    function formatUSD(value) {
+      return "$" + parseFloat(value).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    }
+
+    function formatQty(current, max) {
+      const currentQty = parseFloat(current).toLocaleString();
+      const maxQty = max && max !== "0" ? parseFloat(max).toLocaleString() : "Unlimited";
+      return `${currentQty} / ${maxQty}`;
+    }
+
+    async function render() {
+      const prices = await fetchMarketData();
+      let html = `<table>
+        <tr>
+          <th>Coin</th>
+          <th>Price Current (USDT)</th>
+          <th>Price 24h Past (USDT)</th>
+          <th>24h Change %</th>
+          <th>1h Change %</th>
+          <th>Qty Current / Max</th>
+        </tr>`;
+
+      for (const group in coinGroups) {
+        html += `<tr><td colspan="6" style="font-weight:bold;color:#00e676;">${group}</td></tr>`;
+        for (const sym of coinGroups[group]) {
+          const d = prices[sym];
+          if (!d) continue;
+          const current = parseFloat(d.lastPrice);
+          const percentChange24h = parseFloat(d.priceChangePercent);
+          const open = current / (1 + percentChange24h / 100);
+          const percentChange1h = parseFloat(d.priceChangePercent) / 24; // Simulated 1h
+          const qty = formatQty(d.volume, d.totalSupply || "0");
+          html += `<tr>
+            <td>${sym}</td>
+            <td>${formatUSD(current)}</td>
+            <td>${formatUSD(open)}</td>
+            <td style="color:${percentChange24h >= 0 ? 'lime' : 'red'}">${percentChange24h.toFixed(2)}%</td>
+            <td style="color:${percentChange1h >= 0 ? 'lime' : 'red'}">${percentChange1h.toFixed(2)}%</td>
+            <td>${qty}</td>
+          </tr>`;
+        }
+      }
+
+      html += "</table>";
+      document.getElementById("prices").innerHTML = html;
+    }
+
+    render();
+    setInterval(render, 60_000);
+  </script>
+</body>
+</html>
