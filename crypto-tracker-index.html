@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Binance Crypto Tracker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #121212;
+      color: #eee;
+    }
+    h1 { color: #1DB954; }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: .5rem;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: .5rem;
+      text-align: right;
+    }
+    th {
+      background: #1e1e1e;
+      color: #ddd;
+    }
+    td:first-child,
+    th:first-child {
+      text-align: left;
+    }
+    tr.section-header th {
+      background: transparent;
+      color: #1DB954;
+      font-size: 1.1rem;
+      text-align: left;
+      padding-top: 1rem;
+      border: none;
+    }
+    tr.section-header + tr td {
+      border-top: 1px solid #333;
+    }
+    #chart {
+      margin-top: 2rem;
+      height: 500px;
+    }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #888;
+    }
+  </style>
+  <!-- TradingView widget library -->
+  <script src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
+  <h1>Binance Crypto Tracker</h1>
+  <p>Live prices for your priority tokens (USDT‑base):</p>
+  <div id="prices">Loading…</div>
+  <div id="chart" class="loading">Click a coin above to load its chart…</div>
+
+  <script>
+  // your coins & categories
+  const coinsByCategory = {
+    "Mainstream Coins": [ "bitcoin","ethereum","litecoin" ],
+    "Altcoins":        [ "cardano","solana","polkadot","chainlink","stellar","tron" ],
+    "Exchange & Meme": [ "binancecoin","dogecoin" ],
+    "Ecosystem Coins":[ "cosmos","avalanche-2","theta-token" ]
+  };
+
+  // helper: format numbers
+  const fmt = (n,dec=2) => Number(n).toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  const fmtInt = n => Math.round(n).toLocaleString();
+
+  // build and render the table
+  async function fetchPrices(){
+    const ids = Object.values(coinsByCategory).flat().join(',');
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}`
+              + `&vs_currencies=usd`
+              + `&include_24hr_change=true`
+              + `&include_24hr_vol=true`
+              + `&include_last_updated_at=true`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      let html = `<table>
+        <thead>
+          <tr>
+            <th>Coin</th>
+            <th>Price Current (USDT)</th>
+            <th>Price 24h Past (USDT)</th>
+            <th>24h Change %</th>
+            <th>1h Change %</th>
+            <th>Qty Current / Max</th>
+          </tr>
+        </thead><tbody>`;
+      for (const [section, list] of Object.entries(coinsByCategory)) {
+        html += `<tr class="section-header"><th colspan="6">${section}</th></tr>`;
+        for (const id of list) {
+          const info = data[id] || {};
+          const cur   = info.usd       ?? 0;
+          const chg24= info.usd_24h_change ?? 0;
+          // simulate 1h change by fetching timestamp (approx), or just reuse 24h for demo
+          const chg1 = chg24/24;
+          const vol   = info.usd_24h_vol ?? 0;
+          // max supply mapping
+          const maxSup = {
+            bitcoin:21000000, litecoin:84000000,
+            cardano:45000000000, chainlink:1000000000,
+            stellar:50001786893, avalanche-2:720000000,
+            theta-token:1000000000, binancecoin:200000000
+          }[id] ?? Infinity;
+          html += `<tr data-coin="${id}">
+            <td>${id.toUpperCase().replace('-2','')}</td>
+            <td>$${fmt(cur,3)}</td>
+            <td>$${fmt(cur / (1 + chg24/100),3)}</td>
+            <td style="color:${chg24>=0?'#0f0':'#f66'}">${fmt(chg24,2)}%</td>
+            <td style="color:${chg1>=0?'#0f0':'#f66'}">${fmt(chg1,2)}%</td>
+            <td>${fmtInt(vol)} / ${isFinite(maxSup)?fmtInt(maxSup):'Unlimited'}</td>
+          </tr>`;
+        }
+      }
+      html += `</tbody></table>`;
+      document.getElementById('prices').innerHTML = html;
+
+      // attach click‑listeners
+      document.querySelectorAll('#prices tbody tr[data-coin]').forEach(tr=>{
+        tr.style.cursor='pointer';
+        tr.onclick = ()=>{
+          const coin = tr.getAttribute('data-coin').toUpperCase();
+          loadChart(`BINANCE:${coin}USDT`);
+        };
+      });
+
+    } catch(e){
+      document.getElementById('prices').textContent = 'Error loading data';
+      console.error(e);
+    }
+  }
+
+  // load or update TradingView widget
+  let tvWidget = null;
+  function loadChart(symbol){
+    document.getElementById('chart').classList.remove('loading');
+    document.getElementById('chart').innerHTML = '';
+    tvWidget && tvWidget.remove();
+    tvWidget = new TradingView.widget({
+      container_id: 'chart',
+      autosize: true,
+      symbol: symbol,
+      interval: '60',
+      timezone: 'Etc/UTC',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      toolbar_bg: '#1e1e1e',
+      hide_side_toolbar: false,
+      allow_symbol_change: false,
+      hotlist: false,
+      calendar: false,
+      details: true,
+      withdateranges: true,
+      studies: ['MACD@tv-basicstudies'],
+      show_popup_button: true,
+      popup_width: '1000',
+      popup_height: '650'
+    });
+  }
+
+  fetchPrices();
+  setInterval(fetchPrices, 60_000);
+  </script>
+</body>
+</html>
