@@ -2,12 +2,72 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" href="/favicon.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Crypto Tracker</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Crypto Tracker App</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background:#f5f5f5; }
+    table { border-collapse: collapse; width:100%; margin-top:1rem }
+    th,td { border:1px solid #ddd; padding:.5rem; text-align:left }
+    th { background:#333; color:#fff }
+  </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+  <h1>Crypto Tracker App</h1>
+  <p>Live prices for your priority tokens:</p>
+  <div id="prices">Loading…</div>
+
+  <script>
+    // ← your 15 coins
+    const coins = [
+      'bitcoin',
+      'ethereum',
+      'litecoin',
+      'xrp',
+      'cardano',
+      'solana',
+      'polkadot',
+      'binancecoin',
+      'chainlink',
+      'dogecoin',
+      'stellar',
+      'cosmos',
+      'tron',
+      'avalanche-2',
+      'theta-token'
+    ];
+
+    async function fetchPrices() {
+      try {
+        const url = 'https://api.coingecko.com/api/v3/simple/price'
+          + '?ids=' + coins.join(',')
+          + '&vs_currencies=usd'
+          + '&include_24hr_change=true';
+        const res = await fetch(url);
+        const data = await res.json();
+
+        let html = '<table><tr><th>Coin</th><th>Price (USD)</th><th>24h Change %</th></tr>';
+        for (const id of coins) {
+          const info = data[id] || { usd:0, usd_24h_change:0 };
+          const change = info.usd_24h_change || 0;
+          html += `<tr>
+            <td>${id.toUpperCase()}</td>
+            <td>$${info.usd.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+            <td style="color:${change>=0?'green':'red'}">
+              ${change.toFixed(2)}%
+            </td>
+          </tr>`;
+        }
+        html += '</table>';
+        document.getElementById('prices').innerHTML = html;
+      } catch (e) {
+        document.getElementById('prices').textContent = 'Error loading data';
+        console.error(e);
+      }
+    }
+
+    fetchPrices();
+    // refresh every 60s
+    setInterval(fetchPrices, 60_000);
+  </script>
 </body>
 </html>
