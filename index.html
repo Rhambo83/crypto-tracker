@@ -73,18 +73,23 @@
         const url = 'https://api.coingecko.com/api/v3/coins/markets'
           + '?vs_currency=usd'
           + '&ids=' + ids
-          + '&price_change_percentage=24h';
+          + '&price_change_percentage=1h,24h';
+
         const res = await fetch(url);
         const data = await res.json();
+
         const priceData = {};
         for (const coin of data) {
+          const price24hPast = coin.current_price / (1 + (coin.price_change_percentage_24h / 100));
+          const qtyCurrent = coin.circulating_supply || 0;
+          const qtyMax = coin.max_supply || 0;
+
           priceData[coin.id] = {
             currentPrice: coin.current_price,
-            pastPrice: coin.current_price / (1 + (coin.price_change_percentage_24h / 100)),
-            priceChange: coin.price_change_percentage_24h,
-            currentVol: coin.total_volume,
-            pastVol: coin.total_volume / (1 + (coin.price_change_percentage_24h / 100)),
-            volChange: coin.total_volume === 0 ? 0 : 100 * (coin.total_volume - (coin.total_volume / (1 + (coin.price_change_percentage_24h / 100)))) / (coin.total_volume / (1 + (coin.price_change_percentage_24h / 100)))
+            pastPrice: price24hPast,
+            priceChange24h: coin.price_change_percentage_24h,
+            priceChange1h: coin.price_change_percentage_1h_in_currency,
+            qty: `${Math.round(qtyCurrent)} / ${Math.round(qtyMax)}`
           };
         }
 
@@ -97,25 +102,27 @@
               <th>Price Current (USD)</th>
               <th>Price 24h Past (USD)</th>
               <th>24h Change %</th>
-              <th>Qty Current</th>
-              <th>Qty 24h Past</th>
-              <th>Qty 24h Change %</th>
+              <th>1h Change %</th>
+              <th>Qty Current / Max</th>
             </tr>`;
+
           for (const id of ids) {
             const coin = priceData[id];
             if (!coin) continue;
-            const colorPrice = coin.priceChange >= 0 ? 'limegreen' : 'crimson';
-            const colorVol = coin.volChange >= 0 ? 'limegreen' : 'crimson';
+
+            const color24h = coin.priceChange24h >= 0 ? 'limegreen' : 'crimson';
+            const color1h = coin.priceChange1h >= 0 ? 'limegreen' : 'crimson';
+
             html += `<tr>
               <td>${coinMap[id]}</td>
               <td>$${coin.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               <td>$${coin.pastPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              <td style="color:${colorPrice}">${coin.priceChange.toFixed(2)}%</td>
-              <td>${coin.currentVol.toLocaleString()}</td>
-              <td>${coin.pastVol.toLocaleString()}</td>
-              <td style="color:${colorVol}">${coin.volChange.toFixed(2)}%</td>
+              <td style="color:${color24h}">${coin.priceChange24h.toFixed(2)}%</td>
+              <td style="color:${color1h}">${coin.priceChange1h?.toFixed(2) ?? '0.00'}%</td>
+              <td>${coin.qty}</td>
             </tr>`;
           }
+
           html += '</table>';
         }
 
@@ -131,5 +138,6 @@
   </script>
 </body>
 </html>
+
 
 
