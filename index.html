@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Binance Crypto Tracker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #121212;
+      color: #fff;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #444;
+      padding: 0.5rem;
+      text-align: right;
+    }
+    th {
+      background: #333;
+      color: #fff;
+    }
+    .category {
+      text-align: left;
+      font-weight: bold;
+      color: #00e5a0;
+      padding-top: 1rem;
+    }
+    .positive {
+      color: #00e676;
+    }
+    .negative {
+      color: #ff1744;
+    }
+  </style>
+</head>
+<body>
+  <h1>Binance Crypto Tracker</h1>
+  <p>Live prices for your priority tokens:</p>
+  <div id="prices">Loading…</div>
+
+  <script>
+    const coinGroups = {
+      "Mainstream Coins": ["BTC", "ETH", "LTC"],
+      "Altcoins": ["ADA", "SOL", "DOT", "LINK", "XLM", "TRX"],
+      "Exchange & Meme Coins": ["BNB", "DOGE"],
+      "Ecosystem Coins": ["ATOM", "AVAX", "THETA"]
+    };
+
+    const coinSymbols = Object.values(coinGroups).flat();
+
+    async function fetchPrices() {
+      try {
+        const vsCurrency = "usdt";
+        const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=${vsCurrency}&ids=${coinSymbols.map(c => c.toLowerCase()).join(',')}&price_change_percentage=1h,24h`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const map = {};
+        data.forEach(item => {
+          map[item.symbol.toUpperCase()] = item;
+        });
+
+        let html = `<table>
+          <tr>
+            <th>Coin</th>
+            <th>Price Current (USDT)</th>
+            <th>Price 24h Past (USDT)</th>
+            <th>24h Change %</th>
+            <th>1h Change %</th>
+            <th>Qty Current / Max</th>
+          </tr>`;
+
+        for (const [category, coins] of Object.entries(coinGroups)) {
+          html += `<tr><td class="category" colspan="6">${category}</td></tr>`;
+          for (const symbol of coins) {
+            const coin = map[symbol];
+            if (!coin) continue;
+
+            const price = coin.current_price;
+            const change24h = coin.price_change_percentage_24h_in_currency || 0;
+            const change1h = coin.price_change_percentage_1h_in_currency || 0;
+            const pricePast = price / (1 + change24h / 100);
+            const qty = Math.round(coin.circulating_supply || 0).toLocaleString();
+            const max = coin.max_supply ? Math.round(coin.max_supply).toLocaleString() : "Unlimited";
+
+            html += `<tr>
+              <td style="text-align:left">${symbol}</td>
+              <td>$${price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
+              <td>$${pricePast.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
+              <td class="${change24h >= 0 ? 'positive' : 'negative'}">${change24h.toFixed(2)}%</td>
+              <td class="${change1h >= 0 ? 'positive' : 'negative'}">${change1h.toFixed(2)}%</td>
+              <td>${qty} / ${max}</td>
+            </tr>`;
+          }
+        }
+
+        html += "</table>";
+        document.getElementById("prices").innerHTML = html;
+      } catch (e) {
+        console.error(e);
+        document.getElementById("prices").textContent = "Error loading data";
+      }
+    }
+
+    fetchPrices();
+    setInterval(fetchPrices, 60_000);
+  </script>
+</body>
+</html>
