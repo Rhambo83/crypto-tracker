@@ -1,0 +1,103 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Crypto Tracker App</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background:#121212; color:#f0f0f0; }
+    h1, h2 { color:#00ffcc; }
+    table { border-collapse: collapse; width:100%; margin-top:1rem; table-layout: fixed; }
+    th,td { border:1px solid #444; padding:.5rem; text-align:right; white-space:nowrap; }
+    th:first-child, td:first-child { text-align:left; }
+    th { background:#222; color:#fff }
+    .category-row td { background: #000; color: #00ffcc; font-weight: bold; text-align: left; }
+  </style>
+</head>
+<body>
+  <h1>Crypto Tracker App</h1>
+  <p>Live prices for your priority tokens:</p>
+  <div id="prices">Loading…</div>
+
+  <script>
+    const categories = {
+      'Mainstream Coins': ['BTC', 'ETH', 'LTC'],
+      'Altcoins': ['ADA', 'SOL', 'DOT', 'LINK', 'XLM', 'TRX'],
+      'Exchange & Meme Coins': ['BNB', 'DOGE'],
+      'Ecosystem Coins': ['ATOM', 'AVAX', 'THETA']
+    };
+
+    const coinIds = {
+      BTC: 'bitcoin',
+      ETH: 'ethereum',
+      LTC: 'litecoin',
+      ADA: 'cardano',
+      SOL: 'solana',
+      DOT: 'polkadot',
+      LINK: 'chainlink',
+      XLM: 'stellar',
+      TRX: 'tron',
+      BNB: 'binancecoin',
+      DOGE: 'dogecoin',
+      ATOM: 'cosmos',
+      AVAX: 'avalanche-2',
+      THETA: 'theta-token'
+    };
+
+    async function fetchPrices() {
+      try {
+        const ids = Object.values(coinIds).join(',');
+        const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=' + ids + '&price_change_percentage=1h,24h';
+        const res = await fetch(url);
+        const data = await res.json();
+        const coinMap = {};
+        data.forEach(c => coinMap[c.symbol.toUpperCase()] = c);
+
+        let html = `<table>
+          <tr>
+            <th>Coin</th>
+            <th>Price Current (USD)</th>
+            <th>Price 24h Past (USD)</th>
+            <th>24h Change %</th>
+            <th>1h Change %</th>
+            <th>Qty Current / Max</th>
+          </tr>`;
+
+        for (const [category, symbols] of Object.entries(categories)) {
+          html += `<tr class="category-row"><td colspan="6">${category}</td></tr>`;
+          for (const sym of symbols) {
+            const c = coinMap[sym];
+            if (!c) continue;
+
+            const priceNow = c.current_price;
+            const change24h = c.price_change_percentage_24h || 0;
+            const change1h = c.price_change_percentage_1h_in_currency || 0;
+            const pricePast = priceNow / (1 + change24h / 100);
+            const qty = Math.round(c.circulating_supply).toLocaleString();
+            const max = c.max_supply ? Math.round(c.max_supply).toLocaleString() : 'Unlimited';
+
+            html += `<tr>
+              <td>${sym}</td>
+              <td>$${priceNow.toFixed(3)}</td>
+              <td>$${pricePast.toFixed(3)}</td>
+              <td style="color:${change24h>=0?'#00ff00':'#ff4d4d'}">${change24h.toFixed(2)}%</td>
+              <td style="color:${change1h>=0?'#00ff00':'#ff4d4d'}">${change1h.toFixed(2)}%</td>
+              <td>${qty} / ${max}</td>
+            </tr>`;
+          }
+        }
+
+        html += '</table>';
+        document.getElementById('prices').innerHTML = html;
+      } catch (e) {
+        document.getElementById('prices').textContent = 'Error loading data';
+        console.error(e);
+      }
+    }
+
+    fetchPrices();
+    setInterval(fetchPrices, 60_000);
+  </script>
+</body>
+</html>
